@@ -8,7 +8,6 @@ import (
 	_ "github.com/df-mc/dragonfly/dragonfly/item" // Imported for compiler directives.
 	"github.com/df-mc/dragonfly/dragonfly/player"
 	"github.com/df-mc/dragonfly/dragonfly/player/skin"
-	"github.com/df-mc/dragonfly/dragonfly/plugin"
 	"github.com/df-mc/dragonfly/dragonfly/session"
 	"github.com/df-mc/dragonfly/dragonfly/world"
 	"github.com/df-mc/dragonfly/dragonfly/world/generator"
@@ -52,8 +51,8 @@ type Server struct {
 	// the map.
 	p map[uuid.UUID]*player.Player
 
-	handlers      []interface{}
-	handlersMutex sync.RWMutex
+	plugins      []Plugin
+	pluginsMutex sync.RWMutex
 }
 
 // New returns a new server using the Config passed. If nil is passed, a default configuration is returned.
@@ -149,18 +148,20 @@ func (server *Server) Start() error {
 }
 
 // AddPlugin adds your plugin to the list of all plugins, witch are used to handle events
-func (server *Server) AddPlugin(handler interface{}) {
-	server.handlersMutex.Lock()
-	defer server.handlersMutex.Unlock()
+func (server *Server) AddPlugin(plugin Plugin) {
+	server.pluginsMutex.Lock()
+	defer server.pluginsMutex.Unlock()
 
-	server.handlers = append(server.handlers, handler)
+	plugin.Init(server)
+	server.log.Println("Added plugin:", plugin.GetName())
+	server.plugins = append(server.plugins, plugin)
 }
 
 // GetHandler returns the final plugin containing all server plugins
-func (server *Server) GetHandler() *plugin.Plugin {
-	server.handlersMutex.RLock()
-	defer server.handlersMutex.RUnlock()
-	return plugin.JoinPlugins(server.handlers)
+func (server *Server) GetHandler() *Handler {
+	server.pluginsMutex.RLock()
+	defer server.pluginsMutex.RUnlock()
+	return JoinPlugins(server.plugins)
 }
 
 // Uptime returns the duration that the server has been running for. Measurement starts the moment a call to
